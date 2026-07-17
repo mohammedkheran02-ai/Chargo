@@ -48,12 +48,16 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
     setIsLoading(true);
     try {
+      // Fetch workspaces from Supabase — RLS ensures only authorized workspaces.
+      // Filter user_organizations to current user only, because admin RLS can
+      // see all members' records — we only want THIS user's membership.
       const { data, error } = await supabase
         .from("organizations")
         .select(`
           id, name, slug, workspace_type,
           user_organizations!inner(role, is_default)
         `)
+        .eq("user_organizations.user_id", user.id)
         .order("name");
 
       if (error) {
@@ -74,6 +78,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
       setWorkspaces(parsed);
 
+      // Set current workspace: default first, or first available
       if (parsed.length > 0) {
         const defaultWs = parsed.find((w) => w.is_default) || parsed[0];
         setCurrentWorkspaceState(defaultWs);
@@ -85,6 +90,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
+  // Load workspaces when user changes
   useEffect(() => {
     refresh();
   }, [refresh]);
